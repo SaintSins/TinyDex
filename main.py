@@ -1,11 +1,10 @@
 import os
 import argparse
-import json
 
 from dotenv import load_dotenv
 from openai import OpenAI
 from prompts import system_prompt
-from tools import tools
+from tools import tools, tool_map, call_function
 
 
 def main() -> None:
@@ -60,8 +59,11 @@ def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> Non
     if response_message.tool_calls:
         for tool_call in response_message.tool_calls:
             if tool_call.type == "function":
-                function_args = json.loads(tool_call.function.arguments or "{}")
-                print(f"Calling function: {tool_call.function.name}({function_args})")
+                result_message = call_function(tool_call, verbose)
+                if not result_message.get("content"):
+                    raise RuntimeError(f"Empty function response for {tool_call.function.name}")
+                if verbose:
+                    print(f"-> {result_message['content']}")
     else:
         print(response_message.content)
     

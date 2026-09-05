@@ -1,4 +1,12 @@
 from openai.types.chat import ChatCompletionToolUnionParam
+from collections.abc import Callable
+from config import WORKING_DIR
+from functions.get_files_info import get_files_info
+from functions.get_file_content import get_file_content
+from functions.run_python_file import run_python_file
+from functions.write_file import write_file
+
+import json
 
 #Tool definition schema for get_files_info
 schema_get_files_info: ChatCompletionToolUnionParam = {
@@ -94,3 +102,42 @@ tools: list[ChatCompletionToolUnionParam] = [
     schema_write_file,
     schema_run_python_file
     ]
+
+#Dispatch map
+tool_map: dict[str, Callable[..., str]] = {
+    "get_files_info": get_files_info,
+    "get_file_content": get_file_content,
+    "run_python_file": run_python_file,
+    "write_file": write_file,
+}
+
+#Calls the requested function
+def call_function(tool_call, verbose: bool = False) -> dict:
+
+    #Extracts the name and argument(s) from tool_call 
+    function_name = tool_call.function.name
+    function_args = json.loads(tool_call.function.arguments or "{}")
+
+    if verbose:
+        print(f" - Calling function: {function_name}({function_args})")
+    else:
+        print(f" - Calling function: {function_name}")
+
+    #Fallback for failed calls
+    if function_name not in tool_map:
+        return {
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "content": f"Error: Unknown function: {function_name}",
+        }
+
+    #Injecting working directory as argument
+    function_args["working_directory"] = WORKING_DIR
+    result = tool_map[function_name](**function_args)
+
+    #Payload
+    return {
+        "role": "tool",
+        "tool_call_id": tool_call.id,
+        "content": result,
+    }
