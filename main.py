@@ -44,6 +44,7 @@ def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> Non
             model="openrouter/free",
             messages=messages,
             tools=tools,
+            temperature=0
         )
     #Checks the flag for enabling verbose output
     if verbose:
