@@ -1,8 +1,11 @@
 import os
 import argparse
+import json
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from prompts import system_prompt
+from tools import tools
 
 
 def main() -> None:
@@ -28,7 +31,8 @@ def main() -> None:
     )
 
     #List of messages with role and content to build a conversation history
-    messages = [{"role": "user", "content": prompt}]
+    messages = [{"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}]
 
     #Calls function to generate the response by passing the messages, client obj, verbose flag
     generate_content(client, messages, verbose)
@@ -38,7 +42,8 @@ def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> Non
     #Creates a response obj
     response = client.chat.completions.create(
             model="openrouter/free",
-            messages=messages
+            messages=messages,
+            tools=tools,
         )
     #Checks the flag for enabling verbose output
     if verbose:
@@ -46,9 +51,18 @@ def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> Non
         if response.usage is None:
             raise RuntimeError("Failed to fetch response.usage")
         print(f'User prompt: {messages[0]["content"]}\nPrompt tokens: {response.usage.prompt_tokens}\nResponse tokens: {response.usage.completion_tokens}') #Prints user_prompt, prompt_token and completion_token
-    
-    #Prints the exact answer to prompt
-    print(response.choices[0].message.content)
+
+    #Extracts the message obj from returned response
+    response_message = response.choices[0].message
+
+    # Check if the model decided to execute tools or reply directly
+    if response_message.tool_calls:
+        for tool_call in response_message.tool_calls:
+            if tool_call.type == "function":
+                function_args = json.loads(tool_call.function.arguments or "{}")
+                print(f"Calling function: {tool_call.function.name}({function_args})")
+    else:
+        print(response_message.content)
     
 
 
