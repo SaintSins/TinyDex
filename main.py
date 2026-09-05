@@ -1,10 +1,12 @@
 import os
 import argparse
+import sys
 
 from dotenv import load_dotenv
 from openai import OpenAI
 from prompts import system_prompt
 from tools import tools, tool_map, call_function
+from config import MAX_ITERS
 
 
 def main() -> None:
@@ -34,10 +36,21 @@ def main() -> None:
                 {"role": "user", "content": prompt}]
 
     #Calls function to generate the response by passing the messages, client obj, verbose flag
-    generate_content(client, messages, verbose)
+    for _ in range(MAX_ITERS):
+        try:
+            final_response = generate_content(client, messages, args.verbose)
+            if final_response:
+                print("Final response:")
+                print(final_response)
+                return
+        except Exception as e:
+            print(f"Error in generate_content: {e}")
+
+    print(f"Maximum iterations ({MAX_ITERS}) reached")
+    sys.exit(1)
 
 #Function to generate the response
-def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> None:
+def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> str | None:
     #Creates a response obj
     response = client.chat.completions.create(
             model="openrouter/free",
@@ -50,10 +63,12 @@ def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> Non
         #Checks for usage property in response obj
         if response.usage is None:
             raise RuntimeError("Failed to fetch response.usage")
-        print(f'User prompt: {messages[0]["content"]}\nPrompt tokens: {response.usage.prompt_tokens}\nResponse tokens: {response.usage.completion_tokens}') #Prints user_prompt, prompt_token and completion_token
+        print(f'User prompt: {messages[1]["content"]}\nPrompt tokens: {response.usage.prompt_tokens}\nResponse tokens: {response.usage.completion_tokens}') #Prints user_prompt, prompt_token and completion_token
 
     #Extracts the message obj from returned response
     response_message = response.choices[0].message
+    #After each call response_message is appened to messages list for context history
+    messages.append(response_message)
 
     # Check if the model decided to execute tools or reply directly
     if response_message.tool_calls:
@@ -64,8 +79,10 @@ def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> Non
                     raise RuntimeError(f"Empty function response for {tool_call.function.name}")
                 if verbose:
                     print(f"-> {result_message['content']}")
+                messages.append(result_message)
+        return None
     else:
-        print(response_message.content)
+        return response_message.content
     
 
 
