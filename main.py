@@ -5,7 +5,7 @@ import sys
 from dotenv import load_dotenv
 from openai import OpenAI
 from prompts import system_prompt
-from tools import tools, tool_map, call_function
+from tools import tools, call_function
 from config import MAX_ITERS
 
 
