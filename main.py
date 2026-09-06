@@ -19,7 +19,7 @@ def main() -> None:
 
     #Initialize the CLI parser and define its description
     parser = argparse.ArgumentParser(description='TinyDex')
-    parser.add_argument('user_prompt', type=str, help='User prompt') #Define required positional argument
+    parser.add_argument('user_prompt', type=str, nargs="?", help='Optional user prompt for single tasks') #Define required positional argument
     parser.add_argument('--verbose', action='store_true', help='Enable verbose ouput') #Define optional argument; store_true will parse this as boolean value of True if flag is set otherwise False
     args = parser.parse_args() #Processes CLI input and packages them into 'args' obj
     prompt = args.user_prompt #Access the input via its attribute name
