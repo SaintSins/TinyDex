@@ -19,7 +19,7 @@ def main() -> None:
 
     #Initialize the CLI parser and define its description
     parser = argparse.ArgumentParser(description='TinyDex')
-    parser.add_argument('user_prompt', type=str, nargs="?", help='Optional user prompt for single tasks') #Define required positional argument
+    parser.add_argument('user_prompt', type=str, nargs="?", help='Optional user prompt for single tasks') #Define  optional positional argument
     parser.add_argument('--verbose', action='store_true', help='Enable verbose ouput') #Define optional argument; store_true will parse this as boolean value of True if flag is set otherwise False
     args = parser.parse_args() #Processes CLI input and packages them into 'args' obj
     prompt = args.user_prompt #Access the input via its attribute name
@@ -35,20 +35,7 @@ def main() -> None:
     messages = [{"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}]
 
-    #Calls function to generate the response by passing the messages, client obj, verbose flag
-    for _ in range(MAX_ITERS):
-        try:
-            final_response = generate_content(client, messages, args.verbose)
-            if final_response:
-                print("Final response:")
-                print(final_response)
-                return
-        except Exception as e:
-            print(f"Error in generate_content: {e}")
-
-    print(f"Maximum iterations ({MAX_ITERS}) reached")
-    sys.exit(1)
-
+    
 #Function to generate the response
 def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> str | None:
     #Creates a response obj
@@ -83,7 +70,21 @@ def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> str
         return None
     else:
         return response_message.content
+
+#ReAct tool loop
+def run_react_cycle (client: OpenAI, messages: list, verbose: bool = False) -> str | None:
+    #Calls function to generate the response by passing the messages, client obj, verbose flag
+        for iteration in range(1,MAX_ITERS+1):
+            try:
+                final_response = generate_content(client, messages, verbose)
+                if final_response:
+                    return final_response
+            except Exception as e:
+                print(f"Error during iteration {iteration}: {e}", file=sys.stderr)
+                return None
     
+        print(f"Maximum iterations ({MAX_ITERS}) reached without resolution.", file=sys.stderr)
+        return None
 
 
 if __name__ == "__main__":
