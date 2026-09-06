@@ -32,12 +32,26 @@ def main() -> None:
     )
 
     #List of messages with role and content to build a conversation history
-    messages = [{"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}]
+    messages = [{"role": "system", "content": system_prompt}]
 
+    #Checks for prompt in argument if true the ReAct loop will be executed with single response
+    if prompt:
+        if verbose:
+            print(f'User prompt: {prompt}')
+        messages.append({"role": "user", "content": prompt})
+        answer = run_react_cycle(client, messages, verbose)
+        if answer:
+            print("\nFinal Response:")
+            print(answer)
+        else:
+            sys.exit(1)
+    #Launches interactive REPL session in terminal
+    else:
+        run_interactive_session(client, messages, verbose)
     
 #Function to generate the response
 def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> str | None:
+
     #Creates a response obj
     response = client.chat.completions.create(
             model="openrouter/free",
@@ -45,19 +59,21 @@ def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> str
             tools=tools,
             temperature=0
         )
+    
     #Checks the flag for enabling verbose output
     if verbose:
         #Checks for usage property in response obj
         if response.usage is None:
             raise RuntimeError("Failed to fetch response.usage")
-        print(f'User prompt: {messages[1]["content"]}\nPrompt tokens: {response.usage.prompt_tokens}\nResponse tokens: {response.usage.completion_tokens}') #Prints user_prompt, prompt_token and completion_token
+        print(f'Prompt tokens: {response.usage.prompt_tokens}\nResponse tokens: {response.usage.completion_tokens}') #Prints user_prompt, prompt_token and completion_token
 
     #Extracts the message obj from returned response
     response_message = response.choices[0].message
+
     #After each call response_message is appened to messages list for context history
     messages.append(response_message)
 
-    # Check if the model decided to execute tools or reply directly
+    #Checks if the model decided to execute tools or reply directly
     if response_message.tool_calls:
         for tool_call in response_message.tool_calls:
             if tool_call.type == "function":
@@ -86,6 +102,32 @@ def run_react_cycle (client: OpenAI, messages: list, verbose: bool = False) -> s
         print(f"Maximum iterations ({MAX_ITERS}) reached without resolution.", file=sys.stderr)
         return None
 
+#Interactive terminal loop
+def run_interactive_session(client: OpenAI, messages: list, verbose: bool = False) -> None:
+    print("\nTinyDex Interactive Session (type 'exit' or 'quit' to end)")
+    print("-" * 58)
+
+    while True:
+        try:
+            #Pause and wait for user input in the terminal
+            user_input = input("\nYou > ").strip()
+            if not user_input:
+                continue
+            if user_input.lower() in {"exit", "quit", "q"}:
+                print("Ending session.")
+                break
+
+            #Append the new message to persistent memory
+            messages.append({"role": "user", "content": user_input})
+
+            #Let the ReAct engine run its tool cycles
+            answer = run_react_cycle(client, messages, verbose)
+            if answer:
+                print(f"\nTinyDex > {answer}")
+
+        except (KeyboardInterrupt, EOFError):
+            print("\nEnding session.")
+            break
 
 if __name__ == "__main__":
     main()
