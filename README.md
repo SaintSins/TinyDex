@@ -6,7 +6,7 @@ A lightweight, autonomous coding agent harness built in Python. TinyDex implemen
 
 ## Architecture Overview
 
-TinyDex functions as an **Agent Harness** that bridges raw LLM reasoning with sandboxed local execution"
+TinyDex functions as an **Agent Harness** that bridges raw LLM reasoning with sandboxed local execution.
 
 * **State & Turn Management:** Maintains multi-turn conversation context across system, user, assistant, and tool execution roles.
 * **Execution Dispatcher:** Maps structured tool calls (`tool_calls`) directly to native Python functions and injects safe workspace paths.
@@ -80,16 +80,19 @@ TinyDex functions as an **Agent Harness** that bridges raw LLM reasoning with sa
 
 ## Usage
 
-Run the agent from the command line by supplying a task prompt:
+TinyDex operates in two distinct modes depending on how arguments are passed:
 
-* **Basic task execution:** Displays the function calls and final response.
+* **Interactive REPL Mode (Default):** Launches a continuous multi-turn session in your terminal that preserves conversation history and tool inspection context in RAM across prompts.
 ```bash
-uv run main.py "Inspect the calculator application and run its tests"
+uv run main.py [--verbose]
 ```
-* **Verbose mode:** Displays token metrics and user prompt along side function calls and final response.
+
+* **Single task execution mode:** Executes a one-shot task passed as a command-line argument, running through the tool ReAct cycle until resolution and exiting immediately.
 ```bash
-uv run main.py "Check what files are in the repository" --verbose
+uv run main.py "<prompt>" [--verbose]
 ```
+
+> Note on `--verbose`: When supplied, the agent displays token metrics (prompt and response tokens). In single-task mode, it also echoes the initial user prompt.
 
 ---
 
