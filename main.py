@@ -2,12 +2,19 @@ import os
 import argparse
 import sys
 
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich import print as rprint
+
 from dotenv import load_dotenv
 from openai import OpenAI
 from prompts import system_prompt
 from tools import tools, call_function
 from config import MAX_ITERS
 
+#Creates console obj from rich.console
+console = Console()
 
 def main() -> None:
 
@@ -15,7 +22,10 @@ def main() -> None:
     load_dotenv()
     api_key = os.environ.get('OPENROUTER_API_KEY')
     if api_key is None:
-        raise RuntimeError('API Key is missing')
+        rprint.print(
+            "[bold red]Error:[/bold red] OPENROUTER_API_KEY environment variable is missing.",
+            file=sys.stderr,
+        )
 
     #Initialize the CLI parser and define its description
     parser = argparse.ArgumentParser(description='TinyDex')
@@ -37,12 +47,12 @@ def main() -> None:
     #Checks for prompt in argument if true the ReAct loop will be executed with single response
     if prompt:
         if verbose:
-            print(f'User prompt: {prompt}')
+            console.print(f'[bold dim]Prompt:[/bold dim] {prompt}')
         messages.append({"role": "user", "content": prompt})
         answer = run_react_cycle(client, messages, verbose)
         if answer:
-            print("\nFinal Response:")
-            print(answer)
+            console.print('\n[bold magenta]Final Response:[/bold magenta]')
+            console.print(Markdown(answer))
         else:
             sys.exit(1)
     #Launches interactive REPL session in terminal
@@ -65,7 +75,11 @@ def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> str
         #Checks for usage property in response obj
         if response.usage is None:
             raise RuntimeError("Failed to fetch response.usage")
-        print(f'Prompt tokens: {response.usage.prompt_tokens}\nResponse tokens: {response.usage.completion_tokens}') #Prints user_prompt, prompt_token and completion_token
+         #Prints prompt_token (in) and completion_token (out)
+        console.print(
+            f'[dim]  ↳ Tokens: [cyan]{response.usage.prompt_tokens}[/cyan] in | '
+            f'[cyan]{response.usage.completion_tokens}[/cyan] out[/dim]'
+        )
 
     #Extracts the message obj from returned response
     response_message = response.choices[0].message
@@ -81,7 +95,13 @@ def generate_content(client:OpenAI, messages: list, verbose:bool = False) -> str
                 if not result_message.get("content"):
                     raise RuntimeError(f"Empty function response for {tool_call.function.name}")
                 if verbose:
-                    print(f"-> {result_message['content']}")
+                    raw_content = result_message["content"].strip().replace("\n", " ")
+                    preview = (
+                        (raw_content[:75] + "...")
+                        if len(raw_content) > 75
+                        else raw_content
+                    )
+                    console.print(f'[dim]  └─ Output: {preview}[/dim]')
                 messages.append(result_message)
         return None
     else:
@@ -96,25 +116,36 @@ def run_react_cycle (client: OpenAI, messages: list, verbose: bool = False) -> s
                 if final_response:
                     return final_response
             except Exception as e:
-                print(f"Error during iteration {iteration}: {e}", file=sys.stderr)
+                rprint(
+                        f"[bold red]Error during iteration {iteration}:[/bold red] {e}",
+                        file=sys.stderr
+                    )
                 return None
     
-        print(f"Maximum iterations ({MAX_ITERS}) reached without resolution.", file=sys.stderr)
+        rprint(
+            f"[bold red]Maximum iterations ({MAX_ITERS}) reached without resolution.[/bold red]",
+            file=sys.stderr,
+        )
         return None
 
 #Interactive terminal loop
 def run_interactive_session(client: OpenAI, messages: list, verbose: bool = False) -> None:
-    print("\nTinyDex Interactive Session (type 'exit' or 'quit' to end)")
-    print("-" * 58)
+    console.print(
+        Panel.fit(
+            '[bold cyan]TinyDex Interactive Workspace[/bold cyan]\n'
+            "[dim]Type [bold white]'exit'[/bold white] or [bold white]'quit'[/bold white] to end session[/dim]",
+            border_style="cyan",
+        )
+    )
 
     while True:
         try:
             #Pause and wait for user input in the terminal
-            user_input = input("\nYou > ").strip()
+            user_input = console.input('\n[bold green]You[/bold green] [dim]>[/dim] ').strip()
             if not user_input:
                 continue
             if user_input.lower() in {"exit", "quit", "q"}:
-                print("Ending session.")
+                console.print('[dim]Ending session.[/dim]')
                 break
 
             #Append the new message to persistent memory
@@ -123,10 +154,11 @@ def run_interactive_session(client: OpenAI, messages: list, verbose: bool = Fals
             #Let the ReAct engine run its tool cycles
             answer = run_react_cycle(client, messages, verbose)
             if answer:
-                print(f"\nTinyDex > {answer}")
+                console.print('\n[bold magenta]TinyDex[/bold magenta] [dim]>[/dim] ')
+                console.print(Markdown(answer))
 
         except (KeyboardInterrupt, EOFError):
-            print("\nEnding session.")
+            console.print('\n\n[dim]Ending session.[/dim]')
             break
 
 if __name__ == "__main__":

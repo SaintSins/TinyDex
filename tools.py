@@ -5,8 +5,11 @@ from functions.get_files_info import get_files_info
 from functions.get_file_content import get_file_content
 from functions.run_python_file import run_python_file
 from functions.write_file import write_file
+from rich.console import Console
 
 import json
+
+console = Console()
 
 #Tool definition schema for get_files_info
 schema_get_files_info: ChatCompletionToolUnionParam = {
@@ -119,9 +122,11 @@ def call_function(tool_call, verbose: bool = False) -> dict:
     function_args = json.loads(tool_call.function.arguments or "{}")
 
     if verbose:
-        print(f" - Calling function: {function_name}({function_args})")
+        console.print(
+            f'[yellow]⚙ Tool Call:[/yellow] [bold]{function_name}[/bold]({function_args})'
+        )
     else:
-        print(f" - Calling function: {function_name}")
+        console.print(f'[yellow]⚙ Tool Call:[/yellow] [bold]{function_name}[/bold]')
 
     #Fallback for failed calls
     if function_name not in tool_map:
